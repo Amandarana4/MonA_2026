@@ -1,0 +1,298 @@
+---
+title: "Part 1: Data preprocesing"
+author: "Amanda S. Arana"
+date: "2026-09-25"
+output: html_document
+---
+
+#Part 1: Data preprocesing
+
+## Charge libraries
+
+```{r eval=TRUE, message=FALSE, warning=FALSE}
+
+library(ape) # Analyses of Phylogenetics and Evolution
+library(ggplot2) # Graphing package
+library(phyloseq) # Microbiome analysis
+library(vegan) # Community ecology tools
+library(tidyverse) # Tidyverse packages
+library(devtools) # Package development
+library(qiime2R) # Import QIIME2 artifacts
+library(MicrobeR) # Data visualization
+library(microbiome) # Data analysis and visualization
+#library(microbiomeSeq) # Microbiome data analysis
+library(pander) # Render R objects into Pandoc markdown
+library(ggpubr) # Publication-quality figures
+library(RColorBrewer) # Color palettes
+library(microbiomeutilities) # Utility tools
+library(ggsci) # Scientific journal color palettes
+
+library(MASS) 
+library(ggplot2)
+
+```
+
+## Find Input files
+
+```{r eval=FALSE, message=FALSE, warning=FALSE}
+setwd("~/Desktop/MONAR")
+getwd()
+
+list.files()
+
+```
+
+### Load the ASV table, phylogenetic tree, taxonomic assignment table, and metadata, and load the "qiime2R" library.
+
+```{r eval=TRUE, message=FALSE, warning=FALSE}
+
+library(qiime2R)
+
+phy <- qza_to_phyloseq("table_MonA.qza", "rooted-tree_MonA.qza", "classification_MonA.qza","Mapfile_MonA.tsv")
+print(phy)  
+
+```
+
+```{r results = 'hide' }
+#View ASVs table
+
+otu.df <- as.data.frame(otu_table(phy))
+print(otu.df)  
+
+#View taxa table
+
+taxa.df <- as.data.frame(tax_table(phy))
+
+
+#View metadata
+
+meta.df <- as.data.frame(sample_data(phy))
+
+sample_names(phy)
+
+```
+
+# Create a phylogeny associated with the taxa in the phyloseq object.
+
+```{r }
+plot_tree(phy, method = "treeonly", ladderize = "left")
+
+plot(phy@phy_tree)
+
+```
+
+# Exclude samples that will not be included from the analysis.
+
+```{r}
+
+library(phyloseq)
+
+
+
+samples_to_remove <- c("CUI06R", "EN005R", "EN013R", "EN018R", 
+                       "EN023R", "EN024R", "TZ5062R", "TZ5076M", 
+                       "TZ5092R", "TZUI00R")
+
+
+physeq_filtered <- prune_samples(!(sample_names(phy) %in% samples_to_remove), phy)
+
+# Verify the filtered data 
+physeq_filtered
+
+phy <- physeq_filtered
+
+phy
+```
+
+# Data preprocessing
+
+## Remove contaminants
+
+### Given that the presence of contaminants observed in QIIME View was negligible, only a filtered dataset will be used in this study.
+
+```{r eval=TRUE, message=FALSE, warning=FALSE}
+filterPhyla1 <- c("Chloroplast", "Mitochondria", "Eukaryota", "d__Eukaryota", "Vertebrata", "Archaea", "Protista", "d__Archaea")
+phy2 <- subset_taxa(phy, !Kingdom %in% filterPhyla1)
+phy2 <- subset_taxa(phy2, !Phylum %in% filterPhyla1)
+phy2 <- subset_taxa(phy2, !Class %in% filterPhyla1)
+phy2 <- subset_taxa(phy2, !Order %in% filterPhyla1)
+phy2 <- subset_taxa(phy2, !Family %in% filterPhyla1)
+phy2 <- subset_taxa(phy2, !Genus %in% filterPhyla1)
+phy2 <- subset_taxa(phy2, !Species %in% filterPhyla1)
+phy2 <- subset_taxa(phy2, Phylum != "unidentified")
+phy2 <- subset_taxa(phy2, Phylum != "Unknown")
+
+```
+
+### Check how many ASVs were lost.
+
+```{r}
+ntaxa(phy)-ntaxa(phy2)
+```
+
+# Normalization using a rarefaction curve
+
+```{r eval=TRUE, message=FALSE, warning=FALSE}
+otu_tab <- t(abundances(phy2))
+
+rare <- vegan::rarecurve(otu_tab, 
+                         step = 50, label = T)
+
+phy.rar <- rarefy_even_depth(phy2, rngseed=1, sample.size = 10000, replace = F) 
+
+phy.rar
+
+```
+
+### Check which samples were removed during the rarefaction process.
+
+```{r}
+
+# Obtain the sample names before and after rarefaction.
+samples_antes <- sample_names(phy2)
+samples_despues <- sample_names(phy.rar)
+
+# Compare the samples that were removed.
+muestras_descartadas <- setdiff(samples_antes, samples_despues)
+
+# Display the list in the console
+print(muestras_descartadas)
+```
+
+### Plot: Rarefaction curves
+
+
+# Generate subsets of the phyloseq files by species.
+
+```{r eval=TRUE, message=FALSE, warning=FALSE}
+Alouattapigra.bac <- subset_samples(phy.rar, Especie == "Alouatta pigra")
+Alouattapigra.bac
+
+Alouattapalliata.bac <- subset_samples(phy.rar, Especie == "Alouatta palliata")
+Alouattapalliata.bac
+
+Atelesgeoffroyi.bac <- subset_samples(phy.rar, Especie == "Ateles geoffroyi")
+Atelesgeoffroyi.bac
+```
+
+# Calculation of Alpha Diversity metrics
+
+```{r eval=TRUE, message=FALSE, warning=FALSE, results = 'hide'}
+phy.div <- alpha(phy.rar, index = "all")
+phy.div
+
+#create a table with the diversity metrics and metadata.
+
+# extract the metadata from the phyloseq object.
+phy.meta <- meta(phy.rar)
+#Add the row names as a new column for subsequent table integration.
+phy.meta$sam_name <- rownames(phy.meta)
+#Add the row names as a new column to the diversity table.
+phy.div$sam_name <- rownames(phy.div)
+#Merge these two data tables into one
+div.df <- merge(phy.div,phy.meta, by = "sam_name")
+write.csv(div.df, "Alpha_diversity_metrics.csv", row.names = FALSE)
+
+div.df
+```
+
+#Create subsets of the diversity data
+### Breakdowns by locality (site) subsets
+
+```{r }
+#Zoologico de chapultepec, CDMX
+CH.div <- div.df[div.df$Localidad=="CH" , ]
+
+#Zoologico San Juan de Aragón, CDMX
+
+SJ.div <- div.df[div.df$Localidad=="SJ" , ]
+
+#Zoológico Miguel Alvares del Toro, Tuxtla
+
+ZM.div <- div.df[div.df$Localidad=="ZM" , ]
+
+#Aluxes ecoparque, Palenque
+
+LA.div <- div.df[div.df$Localidad=="LA" , ]
+
+#Jardin Botánico de Pto Morelos
+
+JB.div <- div.df[div.df$Localidad=="JB" , ]
+
+#Hacienda cacaotera la luz, Comalcalco
+
+HL.div <- div.df[div.df$Localidad=="HL" , ]
+
+#Parque museo la venta, Villahermosa
+
+LV.div <- div.df[div.df$Localidad=="LV" , ]
+
+#Parque zoologico Animaya, Merida
+
+AM.div <- div.df[div.df$Localidad=="AM" , ]
+
+#Parque zoologico del centenario, Merida
+
+ZC.div <- div.df[div.df$Localidad=="ZC" , ]
+```
+
+### Breakdowns by diet and enclousure
+
+```{r }
+#Natural Diet: AN
+
+AN.div <- div.df[div.df$Alimentacion=="AN" , ]
+
+#Natural Diet, fruit and vegetables: ANC
+
+ANC.div <- div.df[div.df$Alimentacion=="ANC" , ]
+
+#Natural Diet, fruit, vegetables and pellets: ANCP
+
+ANCP.div <- div.df[div.df$Alimentacion=="ANCP" , ]
+
+#Fruit, vegetables and other complements: FVC
+
+FVC.div <- div.df[div.df$Alimentacion=="FVC" , ]
+
+##Breakdowns by enclousure
+
+#Free without human intervention LSIH
+
+LSIH.div <- div.df[div.df$TipoRecinto=="LSIH" , ]
+
+#Semi enclousure with human intervention SEIH
+
+SEIH.div <- div.df[div.df$TipoRecinto=="SEIH" , ]
+
+#Enclousure with human intervention and exhibition
+
+EIHR.div <- div.df[div.df$TipoRecinto=="EIHR" , ]
+
+#Enclousure in quarantine
+
+EIHC.div <- div.df[div.df$TipoRecinto=="EIHC" , ]
+```
+
+
+
+### Breakdown by medical problem
+
+```{r }
+#Conduct
+
+Conductual.div <- div.df[div.df$ProblemaMedico=="Conductual" , ]
+
+#Respiratory 
+
+Respiratorio.div <- div.df[div.df$ProblemaMedico=="Respiratorio" , ]
+
+#Gastric
+
+Gastrico.div <- div.df[div.df$ProblemaMedico=="Gastrico" , ]
+
+
+#Trisomy
+
+Trisomia.div <- div.df[div.df$ProblemaMedico=="Trisomia" , ]
+```
