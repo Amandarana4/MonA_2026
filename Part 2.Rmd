@@ -1,0 +1,639 @@
+---
+title: "Part 2: Diversity metrics"
+author: "Amanda S. Arana"
+date: "2026-09-25"
+output: html_document
+---
+
+# SHANON Index
+
+##Data distribution
+
+```{r }
+hist(div.df$diversity_shannon)
+```
+
+```{r }
+summary(div.df$diversity_shannon)
+```
+
+```{r }
+shapiro.test(div.df$diversity_shannon)
+```
+
+# Beta diversity visualization
+
+
+```{r}
+library(phyloseq)
+library(vegan)
+library(ggsci)
+library(ggpubr)
+
+```
+
+
+
+#PERMANOVA: Enclousure type and Spp.
+```{r}
+
+## 4. PERMANOVA: 2 variables 
+meta.st <- data.frame(sample_data(phy.rar))
+
+# Complete model with interaction
+permanova.completo <- adonis2(t(otu_table(phy.rar)) ~ TipoRecinto * Especie,
+                              data = meta.st,
+                              permutations = 999,
+                              method = "bray",
+                              by = "margin")  # Marginal effects 
+
+# Additive model (no interaction)
+permanova.aditivo <- adonis2(t(otu_table(phy.rar)) ~ TipoRecinto + Especie,
+                             data = meta.st,
+                             permutations = 999,
+                             method = "bray")
+
+## 5. Results visualization
+cat("\nResultados PERMANOVA (efectos marginales):\n")
+print(permanova.completo)
+
+cat("\nResultados PERMANOVA (modelo aditivo):\n")
+print(permanova.aditivo)
+
+## 6. Save results 
+sink("./Plots/permanova_resultados.txt")
+cat("=== PERMANOVA - Efectos Marginales ===\n")
+print(permanova.completo)
+cat("\n=== PERMANOVA - Modelo Aditivo ===\n")
+print(permanova.aditivo)
+sink()
+```
+
+
+```{r}
+
+permanova.interactivo <- adonis2(
+  formula = t(otu_table(phy.rar)) ~ TipoRecinto * Especie,
+  data = meta.st,
+  permutations = 999,
+  method = "bray",
+  by = NULL        
+)
+
+print(permanova.interactivo)
+```
+
+###Plot: Encolousure Type and Spp.
+
+### PERMANOVA: Individual factor and interaction
+
+```{r}
+adonis2(t(otu_table(phy.rar)) ~ TipoRecinto * Especie,
+        data = meta.st,
+        permutations = 999,
+        method = "bray",
+        by = "terms")  # Esto desglosa los términos
+
+```
+
+#PERMANOVA: Diet and Spp.
+
+```{r}
+
+## PERMANOVA: 2 variables 
+meta.st <- data.frame(sample_data(phy.rar))
+
+# Model with 2 variables
+permanova.completo <- adonis2(t(otu_table(phy.rar)) ~ Alimentacion * Especie,
+                              data = meta.st,
+                              permutations = 999,
+                              method = "bray",
+                              by = "margin")  # Efectos marginales
+
+# Additive model
+permanova.aditivo <- adonis2(t(otu_table(phy.rar)) ~ Alimentacion + Especie,
+                             data = meta.st,
+                             permutations = 999,
+                             method = "bray")
+
+## Data visualization
+cat("\nResultados PERMANOVA (efectos marginales):\n")
+print(permanova.completo)
+
+cat("\nResultados PERMANOVA (modelo aditivo):\n")
+print(permanova.aditivo)
+
+## Save results
+sink("./Plots/permanova_resultados.txt")
+cat("=== PERMANOVA - Efectos Marginales ===\n")
+print(permanova.completo)
+cat("\n=== PERMANOVA - Modelo Aditivo ===\n")
+print(permanova.aditivo)
+sink()
+```
+
+```{r}
+
+permanova.interactivo <- adonis2(
+  formula = t(otu_table(phy.rar)) ~ Alimentacion * Especie,
+  data = meta.st,
+  permutations = 999,
+  method = "bray",
+  by = NULL        
+)
+
+print(permanova.interactivo)
+```
+
+```{r}
+adonis2(t(otu_table(phy.rar)) ~ Alimentacion * Especie,
+        data = meta.st,
+        permutations = 999,
+        method = "bray",
+        by = "terms")  
+
+```
+
+#PCoA Bray Curtis 
+
+```{r message=FALSE, warning=FALSE}
+
+library(phyloseq)
+library(ggplot2)
+library(vegan)
+library(MetBrewer)
+library(ggpubr)
+library(patchwork) 
+
+```
+
+```{r}
+## 1. Use complete data set by specie
+phy.all <- phy.rar 
+
+## 2. Calcute PCoA
+pcoa.all <- ordinate(phy.all, "PCoA", "bray")
+
+```
+
+
+```{r}
+## 6. PERMANOVA: all spp. triple interacction 
+
+meta.all <- data.frame(sample_data(phy.all))
+
+# Complete model
+permanova.full <- adonis2(t(otu_table(phy.all)) ~ Especie * Alimentacion * TipoRecinto,
+                          data = meta.all,
+                          permutations = 999,
+                          method = "bray",
+                          by = "margin") # Efectos marginales
+
+permanova.full
+
+# Simpl. Model
+permanova.simple <- adonis2(t(otu_table(phy.all)) ~ Especie + Alimentacion + TipoRecinto,
+                            data = meta.all,
+                            permutations = 999,
+                            method = "bray")
+
+permanova.simple
+
+# Save results
+sink("./Plots/permanova_todas_especies.txt")
+cat("=== PERMANOVA - Modelo Completo ===\n")
+print(permanova.full)
+cat("\n=== PERMANOVA - Modelo Simplificado ===\n")
+print(permanova.simple)
+sink()
+
+plot.facet
+```
+
+```{r}
+
+permanova.interactivo <- adonis2(
+  formula = t(otu_table(phy.rar)) ~ Alimentacion * Especie * TipoRecinto,
+  data = meta.st,
+  permutations = 999,
+  method = "bray",
+  by = NULL        
+)
+
+print(permanova.interactivo)
+```
+
+
+### PERMANOVA: Individual factor and interacction
+
+```{r}
+adonis2(t(otu_table(phy.rar)) ~ Alimentacion * Especie * TipoRecinto,
+        data = meta.st,
+        permutations = 999,
+        method = "bray",
+        by = "terms")  
+
+```
+
+```{r}
+## Dispersal Analysis
+dispersion <- list(
+  Especie = betadisper(vegdist(t(otu_table(phy.all))), meta.all$Especie),
+  Alimentacion = betadisper(vegdist(t(otu_table(phy.all))), meta.all$Alimentacion),
+  TipoRecinto = betadisper(vegdist(t(otu_table(phy.all))), meta.all$TipoRecinto)
+)
+
+sink("./Plots/dispersion_todas_especies.txt")
+cat("=== Homogeneidad de varianzas ===\n")
+lapply(dispersion, function(x) {
+  cat("\n")
+  print(anova(x))
+})
+sink()
+```
+
+# PCoA Unifrac weighted and unweighted by Spp.
+
+```{r}
+# Weighted matrix by spp.
+
+Unif <- microbiome::transform(phy.rar, "compositional")
+UnifU <- ordinate(Unif, "PCoA", "unifrac", weighted = TRUE)
+```
+
+
+```{r}
+#PERMANOVA Ponderate Matrix by Spp
+# load libraries
+library(phyloseq)
+library(vegan)
+library(microbiome)
+
+# Transform to compositional (normalization)
+Unif <- microbiome::transform(phy.rar, "compositional")
+
+# Obtain Unifrac weighted distances matrix 
+dist_unif_weighted <- phyloseq::distance(Unif, method = "unifrac", weighted = TRUE)
+
+# Extract metadata
+metadata <- data.frame(sample_data(Unif))
+
+# PERMANOVA adonis2 (999 permutations)
+permanova_result <- adonis2(dist_unif_weighted ~ Especie, data = metadata)
+
+# Show results
+print(permanova_result)
+
+```
+
+```{r}
+#UnWeighted matrix by Spp.
+
+Unif <- microbiome::transform(phy.rar, "compositional")
+UnifU <- ordinate(Unif, "PCoA", "unifrac", weighted = FALSE)
+```
+
+```{r}
+#PERMANOVA UnWeighted matrix by Spp.
+# load libraries
+library(phyloseq)
+library(vegan)
+library(microbiome)
+
+# Transform to compositional (normalization)
+Unif <- microbiome::transform(phy.rar, "compositional")
+
+# Obtain Unifrac Unweighted distances matrix 
+dist_unif_unweighted <- phyloseq::distance(Unif, method = "unifrac", weighted = FALSE)
+
+# Extract metadata
+metadata <- data.frame(sample_data(Unif))
+
+# PERMANOVA adonis2 (999 permutations)
+permanova_result_unweighted <- adonis2(dist_unif_unweighted ~ Especie, data = metadata)
+
+# Show results
+print(permanova_result_unweighted)
+
+```
+
+
+
+```{r}
+#Create function: Paired PERMANOVA
+#For weighted distance
+
+run_pairwise_permanova <- function(physeq_obj, species1, species2) {
+  # Obain metadata
+  meta <- data.frame(sample_data(physeq_obj))
+  
+  # Filtrate 2 spp.
+  keep_samples <- rownames(meta[meta$Especie %in% c(species1, species2), ])
+  
+  # Subset phyloseq object  
+  phy_pair <- prune_samples(keep_samples, physeq_obj)
+  
+  # Transform to compositional
+  phy_pair_comp <- microbiome::transform(phy_pair, "compositional")
+  
+  # Calculate  UniFrac weihgted distance
+  dist_matrix <- phyloseq::distance(phy_pair_comp, method = "unifrac", weighted = TRUE)
+  
+  # Extract metadata
+  metadata <- data.frame(sample_data(phy_pair_comp))
+  
+  # Run PERMANOVA
+  result <- adonis2(dist_matrix ~ Especie, data = metadata)
+  
+  # print results
+  cat("\n==============================\n")
+  cat("Comparación:", species1, "vs", species2, "\n")
+  print(result)
+  cat("==============================\n")
+}
+
+
+```
+
+```{r}
+# Specific comparations
+run_pairwise_permanova(Unif, "Alouatta pigra", "Alouatta palliata")
+run_pairwise_permanova(Unif, "Alouatta pigra", "Ateles geoffroyi")
+run_pairwise_permanova(Unif, "Alouatta palliata", "Ateles geoffroyi")
+
+```
+
+
+```{r}
+#Create function: Paired PERMANOVA
+#For Unweighted distance
+
+run_pairwise_permanova <- function(physeq_obj, species1, species2) {
+ 
+  # Obain metadata
+  meta <- data.frame(sample_data(physeq_obj))
+  
+# Filtrate 2 spp.
+  keep_samples <- rownames(meta[meta$Especie %in% c(species1, species2), ])
+  
+  # Subset phyloseq object  
+  phy_pair <- prune_samples(keep_samples, physeq_obj)
+  
+# Transform to compositional
+  phy_pair_comp <- microbiome::transform(phy_pair, "compositional")
+  
+ # Calculate  UniFrac weihgted distanc
+  dist_matrix <- phyloseq::distance(phy_pair_comp, method = "unifrac", weighted = FALSE)
+  
+   # Extract metadata
+  metadata <- data.frame(sample_data(phy_pair_comp))
+  
+  # Run PERMANOVA
+  result <- adonis2(dist_matrix ~ Especie, data = metadata)
+  
+  # print results
+  cat("\n==============================\n")
+  cat("Comparación:", species1, "vs", species2, "\n")
+  print(result)
+  cat("==============================\n")
+}
+
+
+```
+
+```{r}
+# Specific comparations
+run_pairwise_permanova(Unif, "Alouatta pigra", "Alouatta palliata")
+run_pairwise_permanova(Unif, "Alouatta pigra", "Ateles geoffroyi")
+run_pairwise_permanova(Unif, "Alouatta palliata", "Ateles geoffroyi")
+
+```
+
+#PCoA: ***Ateles geoffroyi***
+
+```{r eval=TRUE, message=FALSE, warning=FALSE}
+
+# Load libraries
+library(phyloseq)
+library(ggplot2)
+library(vegan)
+library(MetBrewer)
+library(ggpubr)  # Para combinar gráficos
+
+## 1. Filtrate:  Ateles geoffroyi 
+phy.ateles <- subset_samples(phy.rar, Especie == "Ateles geoffroyi")
+
+## 2. Calculate PCoA
+pcoa.ateles  <- ordinate(phy.ateles, "PCoA", "bray")
+```
+
+```{r message=FALSE, warning=FALSE}
+
+## 6. PERMANOVA for two variables: enclousure type and diet
+meta.ateles <- data.frame(sample_data(phy.ateles))
+
+# Interaction model
+permanova.full <- adonis2(t(otu_table(phy.ateles)) ~ Alimentacion * TipoRecinto,
+                          data = meta.ateles,
+                          permutations = 999,
+                          method = "bray")
+
+# Additive model
+permanova.add <- adonis2(t(otu_table(phy.ateles)) ~ Alimentacion + TipoRecinto,
+                         data = meta.ateles,
+                         permutations = 999,
+                         method = "bray")
+
+# Save 
+sink("./Plots/permanova_resultados.txt")
+cat("=== PERMANOVA - Modelo Completo (con interacción) ===\n")
+print(permanova.full)
+cat("\n=== PERMANOVA - Modelo Aditivo ===\n")
+print(permanova.add)
+sink()
+```
+
+# PCoA by Specie (only ***Ateles geoffroyi***)
+
+```{r message=FALSE, warning=FALSE}
+
+# Load libraries
+library(phyloseq)
+library(ggplot2)
+library(vegan)
+library(RColorBrewer)
+```
+
+```{r message=FALSE, warning=FALSE}
+
+## 1. Filtrate:  Ateles geoffroyi 
+phy.ateles <- subset_samples(phy.rar, Especie == "Ateles geoffroyi")
+
+## 2. Calculate PCoA 
+pcoa.ateles <- ordinate(phy.ateles, "PCoA", "bray")
+```
+
+
+# PCoA: ***Alouata palliata***
+
+```{r eval=TRUE, message=FALSE, warning=FALSE}
+
+# load libraries
+library(phyloseq)
+library(ggplot2)
+library(vegan)
+library(MetBrewer)
+library(ggpubr)  
+
+## 1. Filtrate: Alouatta palliata
+phy.palliata <- subset_samples(phy.rar, Especie == "Alouatta palliata")
+
+## 2. Calculate PCoA 
+pcoa.palliata  <- ordinate(phy.palliata, "PCoA", "bray")
+```
+
+```{r message=FALSE, warning=FALSE}
+
+## PERMANOVA for two variables: enclousure type and diet
+meta.palliata <- data.frame(sample_data(phy.palliata))
+
+# Interaction Model
+permanova.full <- adonis2(t(otu_table(phy.palliata)) ~ Alimentacion * TipoRecinto,
+                          data = meta.palliata,
+                          permutations = 999,
+                          method = "bray")
+
+# Additive model
+permanova.add <- adonis2(t(otu_table(phy.palliata)) ~ Alimentacion + TipoRecinto,
+                         data = meta.palliata,
+                         permutations = 999,
+                         method = "bray")
+
+# Save results
+sink("./Plots/permanova_resultados.txt")
+cat("=== PERMANOVA - Modelo Completo (con interacción) ===\n")
+print(permanova.full)
+cat("\n=== PERMANOVA - Modelo Aditivo ===\n")
+print(permanova.add)
+sink()
+```
+
+```{r message=FALSE, warning=FALSE}
+
+## Dispersion analysis
+disp.alim <- betadisper(vegdist(t(otu_table(phy.palliata))), meta.palliata$Alimentacion)
+disp.recinto <- betadisper(vegdist(t(otu_table(phy.palliata))), meta.palliata$TipoRecinto)
+
+# Save results
+sink("./Plots/dispersión_resultados.txt")
+cat("=== Homogeneidad de varianzas - Alimentación ===\n")
+print(anova(disp.alim))
+cat("\n=== Homogeneidad de varianzas - TipoRecinto ===\n")
+print(anova(disp.recinto))
+sink()
+```
+
+
+# PCoA by Specie (only ***Alouatta palliata***)
+
+```{r message=FALSE, warning=FALSE}
+
+# load libraries
+library(phyloseq)
+library(ggplot2)
+library(vegan)
+library(MetBrewer)
+```
+
+```{r message=FALSE, warning=FALSE}
+
+## 1. Filtrate for A.palliata
+phy.palliata <- subset_samples(phy.rar, Especie == "Alouatta palliata")
+
+## 2. Calculate PCoA 
+pcoa.palliata <- ordinate(phy.palliata, "PCoA", "bray")
+```
+
+
+
+# PCoA: ***Alouata pigra***
+
+
+```{r eval=TRUE, message=FALSE, warning=FALSE}
+
+# load libraries
+library(phyloseq)
+library(ggplot2)
+library(vegan)
+library(MetBrewer)
+library(ggpubr)  
+
+## 1. Filtrate: A. pigra
+phy.pigra <- subset_samples(phy.rar, Especie == "Alouatta pigra")
+
+## 2. Calculate PCoA
+pcoa.pigra  <- ordinate(phy.pigra, "PCoA", "bray")
+```
+
+```{r message=FALSE, warning=FALSE}
+
+## PERMANOVA for two variables: enclousure type and diet
+meta.pigra <- data.frame(sample_data(phy.pigra))
+
+# Interaction Model
+permanova.full <- adonis2(t(otu_table(phy.pigra)) ~ Alimentacion * TipoRecinto,
+                          data = meta.pigra,
+                          permutations = 999,
+                          method = "bray")
+
+# Additive model
+permanova.add <- adonis2(t(otu_table(phy.pigra)) ~ Alimentacion + TipoRecinto,
+                         data = meta.pigra,
+                         permutations = 999,
+                         method = "bray")
+
+# Save results
+sink("./Plots/permanova_resultados.txt")
+cat("=== PERMANOVA - Modelo Completo (con interacción) ===\n")
+print(permanova.full)
+cat("\n=== PERMANOVA - Modelo Aditivo ===\n")
+print(permanova.add)
+sink()
+```
+
+```{r message=FALSE, warning=FALSE}
+
+## Dispersion analysis
+disp.alim <- betadisper(vegdist(t(otu_table(phy.pigra))), meta.pigra$Alimentacion)
+disp.recinto <- betadisper(vegdist(t(otu_table(phy.pigra))), meta.pigra$TipoRecinto)
+
+#Save results
+sink("./Plots/dispersión_resultados.txt")
+cat("=== Homogeneidad de varianzas - Alimentación ===\n")
+print(anova(disp.alim))
+cat("\n=== Homogeneidad de varianzas - TipoRecinto ===\n")
+print(anova(disp.recinto))
+sink()
+```
+
+
+# PCoA by Specie (only ***Alouatta pigra***)
+
+```{r message=FALSE, warning=FALSE}
+
+# load libraries
+library(phyloseq)
+library(ggplot2)
+library(vegan)
+library(MetBrewer)
+```
+
+```{r message=FALSE, warning=FALSE}
+
+## 1. Filtrate for A.pigra
+phy.pigra <- subset_samples(phy.rar, Especie == "Alouatta pigra")
+
+## 2. Calculate PCoA 
+pcoa.pigra <- ordinate(phy.pigra, "PCoA", "bray")
+```
+
